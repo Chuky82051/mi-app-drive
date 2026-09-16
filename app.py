@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import json
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.document_loaders import GoogleDriveLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -9,18 +10,29 @@ from langchain.chains import RetrievalQA
 st.set_page_config(page_title="Mi Asistente Drive Pro", page_icon="🚀")
 st.title("🚀 Chatbot con mi Google Drive (Gemini Pro)")
 
+# Cargar las claves secretas
 try:
     os.environ["GOOGLE_API_KEY"] = st.secrets["GEMINI_API_KEY"]
 except:
-    st.warning("⚠️ Falta configurar la API Key de Gemini en los secrets de Streamlit.")
+    st.warning("⚠️ Falta configurar la API Key de Gemini en los secrets.")
+
+# Crear el archivito temporal con la llave del robot para Drive
+try:
+    if "GOOGLE_CREDENTIALS" in st.secrets:
+        with open("llave_robot.json", "w") as f:
+            f.write(st.secrets["GOOGLE_CREDENTIALS"])
+except Exception as e:
+    st.error(f"Error al leer la llave del robot: {e}")
 
 @st.cache_resource
 def procesar_drive(folder_id):
     st.info("Leyendo documentos de Google Drive... 🔄 (Esto puede tardar un poquito)")
     try:
+        # Acá le decimos que use la llave que acabamos de crear
         loader = GoogleDriveLoader(
             folder_id=folder_id,
-            recursive=False 
+            recursive=False,
+            service_account_key="llave_robot.json" 
         )
         docs = loader.load()
         if not docs:
