@@ -10,11 +10,12 @@ from langchain.chains import RetrievalQA
 st.set_page_config(page_title="Mi Asistente Drive Pro", page_icon="🚀")
 st.title("🚀 Chatbot con mi Google Drive (Gemini Pro)")
 
-# Cargar las claves secretas
+# Nos aseguramos de tener la API Key a mano
 try:
-    os.environ["GOOGLE_API_KEY"] = st.secrets["GEMINI_API_KEY"]
+    gemini_key = st.secrets["GEMINI_API_KEY"]
 except:
     st.warning("⚠️ Falta configurar la API Key de Gemini en los secrets.")
+    gemini_key = None
 
 # Crear el archivito temporal con la llave del robot para Drive
 try:
@@ -28,7 +29,6 @@ except Exception as e:
 def procesar_drive(folder_id):
     st.info("Leyendo documentos de Google Drive... 🔄 (Esto puede tardar un poquito)")
     try:
-        # Acá le decimos que lea texto, planillas y PDFs
         loader = GoogleDriveLoader(
             folder_id=folder_id,
             recursive=False,
@@ -41,12 +41,18 @@ def procesar_drive(folder_id):
             return None
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
         textos_divididos = text_splitter.split_documents(docs)
-        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        
+        # ACÁ ESTÁ EL ARREGLO: Le pasamos la clave de Gemini directamente
+        embeddings = GoogleGenerativeAIEmbeddings(
+            model="models/embedding-001",
+            google_api_key=gemini_key
+        )
+        
         base_de_datos = FAISS.from_documents(textos_divididos, embeddings)
         st.success(f"¡Listo! Se procesaron {len(docs)} documentos. ✅")
         return base_de_datos
     except Exception as e:
-        st.error(f"Error al conectar con Drive: {e}")
+        st.error(f"Error al conectar: {e}")
         return None
 
 with st.sidebar:
@@ -75,7 +81,14 @@ if pregunta:
     
     with st.chat_message("assistant"):
         if "vectorstore" in st.session_state and st.session_state.vectorstore is not None:
-            llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0.3)
+            
+            # ACÁ TAMBIÉN: Le pasamos la clave de Gemini directamente
+            llm = ChatGoogleGenerativeAI(
+                model="gemini-1.5-pro", 
+                temperature=0.3,
+                google_api_key=gemini_key
+            )
+            
             qa_chain = RetrievalQA.from_chain_type(
                 llm=llm,
                 chain_type="stuff",
