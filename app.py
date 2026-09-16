@@ -4,7 +4,9 @@ from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmb
 from langchain_community.document_loaders import GoogleDriveLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain.chains import RetrievalQA
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.prompts import ChatPromptTemplate
 
 st.set_page_config(page_title="Mi Asistente Drive Pro", page_icon="🚀")
 st.title("🚀 Chatbot con mi Google Drive (Gemini Pro)")
@@ -63,14 +65,21 @@ if pregunta:
     with st.chat_message("assistant"):
         if "vectorstore" in st.session_state and st.session_state.vectorstore is not None:
             llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0.3)
-            qa_chain = RetrievalQA.from_chain_type(
-                llm=llm,
-                chain_type="stuff",
-                retriever=st.session_state.vectorstore.as_retriever()
-            )
+            
+            # Configuramos la IA con la forma moderna
+            prompt = ChatPromptTemplate.from_template("""
+            Respondé a la pregunta basándote solo en el siguiente contexto:
+            {context}
+            
+            Pregunta: {input}
+            """)
+            
+            document_chain = create_stuff_documents_chain(llm, prompt)
+            retrieval_chain = create_retrieval_chain(st.session_state.vectorstore.as_retriever(), document_chain)
+            
             with st.spinner("Gemini Pro está analizando tus documentos..."):
-                respuesta = qa_chain.run(pregunta)
-                st.markdown(respuesta)
-                st.session_state.mensajes.append({"rol": "assistant", "contenido": respuesta})
+                respuesta = retrieval_chain.invoke({"input": pregunta})
+                st.markdown(respuesta["answer"])
+                st.session_state.mensajes.append({"rol": "assistant", "contenido": respuesta["answer"]})
         else:
             st.warning("⚠️ Primero tenés que cargar los documentos de Drive desde el menú de la izquierda.")
