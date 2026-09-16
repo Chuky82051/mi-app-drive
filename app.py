@@ -28,10 +28,11 @@ except Exception as e:
 def procesar_drive(folder_id):
     st.info("Leyendo documentos de Google Drive... 🔄 (Esto puede tardar un poquito)")
     try:
-        # Acá le decimos que use la llave que acabamos de crear
+        # Acá le decimos que lea texto, planillas y PDFs
         loader = GoogleDriveLoader(
             folder_id=folder_id,
             recursive=False,
+            file_types=["document", "sheet", "pdf"],
             service_account_key="llave_robot.json" 
         )
         docs = loader.load()
